@@ -1,0 +1,277 @@
+Dim fm(88) As Double
+Dim f As Double
+Dim tn(88) As String
+Dim in As String
+Randomize Timer(.001)
+Dim t As Double
+Dim Left As _MEM, Right As _MEM
+ 
+ 
+ 
+ 
+Print "Welcone to Random Tones and Chords Generator v0.1b"
+Print
+Input "Please specify Chord possibility in % (25):"; uaw$
+Input "Please set music time [sec] for generating WAV file (120):"; uWAVLen
+Input "Please set BPM (120):"; ubpm$
+Input "Please set Pauses possibility in % (5):"; up$
+ 
+If uWAVLen$ = "" Or Val(uWAVLen$) < 0 Or Val(uWAVLen$) > 1000 Then
+    WAVLen = 120
+Else WAVLen = Val(uWAVLen$)
+End If
+Print "Music Time:"; LTrim$(Str$(WAVLen)); "s"
+ 
+If uaw$ = "" Or Val(uaw$) < 0 Or Val(uaw$) > 100 Then
+    aw = 25
+Else aw = Val(uaw$)
+End If
+Print "Chords possibility:"; aw; "%"
+ 
+If ubpm$ = "" Or Val(ubpm$) < 0 Or Val(ubpm$) > 1000 Then
+    bpm = 120
+Else bpm = Val(ubpm$)
+End If
+Print "BPM:"; bpm
+ 
+ 
+If up$ = "" Or Val(up$) < 0 Or Val(up$) > 100 Then
+    pperc = 5
+Else pperc = Val(up$)
+End If
+Print "Pauses:"; LTrim$(Str$(pperc)); "%"
+ 
+ 
+Dim RawMusic(_Ceil(_SndRate * WAVLen)) As Single
+ 
+Left = _Mem(RawMusic())
+Right = _Mem(RawMusic()) 'mono signal, so both channels are the same
+ 
+ 
+'bpm = 120
+'interval 1 and 2 (semitones)
+int1 = 4
+int2 = 7
+'interval possibility percent
+'aw = 25
+'tone minimum and maximum
+tmin = 35
+tmax = 47
+'lengths min and max
+lmin = 2
+lmax = 4
+'fill the tone names
+For i = 1 To 88
+    f = ((2 ^ ((i - 49) / 12)) * 440)
+    fm(i) = CInt(f)
+    Select Case i Mod 12
+        Case 1: tn(i) = "A"
+        Case 2: tn(i) = "A#"
+        Case 3: tn(i) = "B"
+        Case 4: tn(i) = "C"
+        Case 5: tn(i) = "C#"
+        Case 6: tn(i) = "D"
+        Case 7: tn(i) = "D#"
+        Case 8: tn(i) = "E"
+        Case 9: tn(i) = "F"
+        Case 10: tn(i) = "F#"
+        Case 11: tn(i) = "G"
+        Case 0: tn(i) = "G#"
+    End Select
+    'Select Case Int(i / 12)
+    '    Case 0: tn(i) = tn(i) + "0"
+ 
+    'End Select
+    'DEBUG
+    'Print f; tn(i)
+    'If i > 24 Then Sleep
+Next i
+ 
+'delete all sharp tones
+For i = 1 To 88
+    If Mid$(tn(i), 2, 1) = "#" Then
+        tn(i) = tn(i - 1)
+        fm(i) = fm(i - 1)
+    End If
+Next i
+'DEBUG fm(49)="A"
+'Print fm(49)
+ 
+'fill the lengths
+For i = 1 To 7
+    lm(i) = 2 ^ i / 2
+    'DEBUG
+    'Print lm(i)
+ 
+Next i
+ 
+Do
+    'tones between tmin and tmax
+    i = CInt((Rnd * (tmax - tmin)) + tmin)
+ 
+    'Pauses
+    If Rnd < pperc / 100 Then p = 1 Else p = 0
+ 
+    lr = lm(CInt(Rnd * (lmax - lmin)) + lmin) 'Length out of the lenght fields between 2 and 4
+    L = 1 / lr * 60 / bpm * 4 'Lenght is parts of a second from the length fields multiplied by bpm
+ 
+    If Rnd < aw / 100 Then
+        akk = 1
+    Else akk = 0
+    End If
+ 
+    t = 0
+    If akk = 1 And p = 0 Then
+        Print "1/"; LTrim$(Str$(lr)); " Tone:"; tn(i); "+"; tn(i + int1); "+"; tn(i + 7)
+    ElseIf akk = 0 And p = 0 Then Print "1/"; LTrim$(Str$(lr)); " Tone:"; tn(i)
+    ElseIf p = 1 Then Print "1/"; LTrim$(Str$(lr)); " Pause"
+    End If
+    Do
+        'queue some sound
+        Do While t < L 'you may wish to adjust this
+            sample1 = Sin(t * fm(i) * Atn(1) * 8) / 3 * 2
+            sample1 = sample1 * Exp(-t * L) / 3 * 2
+ 
+            t = t + 1 / _SndRate
+ 
+            If akk = 1 Then
+                sample2 = Sin(t * fm(i + int1) * Atn(1) * 8) / 3 * 2
+                sample2 = sample2 * Exp(-t * L) / 3 * 2
+                sample1 = (sample1 + sample2) / 2
+ 
+                '_SndRaw sample2
+                't = t + 1 / _SndRate
+                sample3 = Sin(t * fm(i + int2) * Atn(1) * 8) / 3 * 2
+                sample3 = sample3 * Exp(-t * L) / 3 * 2
+                sample1 = (sample1 + sample3) / 2
+                '_SndRaw sample
+                't = t + 1 / _SndRate
+            End If
+            If p = 1 Then sample1 = 0
+            _SndRaw sample1
+            RawMusic(rwi) = sample1
+            rwi = rwi + 1
+ 
+            If rwi > UBound(RawMusic) Then
+                Print "Sound generated, saving to file generated.wav"
+                _Delay .5
+                SAVESOUND8S Left, Right, "generated.wav"
+                _MemFree Left
+                _MemFree Right
+                Erase RawMusic
+                System
+            End If
+        Loop
+ 
+ 
+    Loop While t < L 'play for l seconds
+ 
+    Do While _SndRawLen > 0 'Finish any left over queued sound!
+    Loop
+    _SndRawDone
+ 
+ 
+Loop While in = ""
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Sub SAVESOUND8S (Left As _MEM, Right As _MEM, file As String) 'Left and Right memory blocks contains value -1 to 1 (_SNDRAW compatible)
+ 
+    Size = OFFSET_to_I64(Left.SIZE) 'convertion is used for WAV file header, becuse offset value can not be used directly
+ 
+    Type head8
+        chunk As String * 4 '       4 bytes  (RIFF)
+        size As Long '              4 bytes  (file size)
+        fomat As String * 4 '       4 bytes  (WAVE)
+        sub1 As String * 4 '        4 bytes  (fmt )
+        subchunksize As Long '      4 bytes  (lo / hi), $00000010 for PCM audio
+        format As Integer '         2 bytes  (0001 = standard PCM, 0101 = IBM mu-law, 0102 = IBM a-law, 0103 = IBM AVC ADPCM)
+        channels As Integer '       2 bytes  (1 = mono, 2 = stereo)
+        rate As Long '              4 bytes  (sample rate, standard is 44100)
+        ByteRate As Long '          4 bytes  (= sample rate * number of channels * (bits per channel /8))
+        Block As Integer '          2 bytes  (block align = number of channels * bits per sample /8)
+        Bits As Integer '           2 bytes  (bits per sample. 8 = 8, 16 = 16)
+        subchunk2 As String * 4 '   4 bytes  ("data")  contains begin audio samples
+        lenght As Long '            4 bytes  Data block size
+    End Type '                     44 bytes  total
+    Dim H8 As head8
+    ch = FreeFile
+ 
+    H8.chunk = "RIFF"
+    H8.size = 44 + Size / 2
+ 
+    H8.fomat = "WAVE"
+    H8.sub1 = "fmt "
+    H8.subchunksize = 16
+    H8.format = 1
+    H8.channels = 2
+    H8.rate = 44100
+    H8.ByteRate = 44100 * 2 * 8 / 8
+    H8.Block = 2
+    H8.Bits = 8
+    H8.subchunk2 = "data"
+    H8.lenght = Size / 2
+    If _FileExists(file$) Then Kill file$
+ 
+    Open file$ For Binary As #ch
+    Put #ch, , H8
+ 
+    Dim LeftChannel8 As _Byte, RightChannel8 As _Byte, RawLeft As Single, RawRight As Single
+    Dim Recalc As _MEM, size As _Offset
+ 
+    size = Left.SIZE 'now this value is for memory size used by SINGLE ARRAY - WAV 8bit need 1 byte for 1 channel and 1 sample
+ 
+    'recalculate audiodata to file - byte - values
+ 
+    Recalc = _MemNew(size / 2) 'this is value used by WAV - size is 4 byte per sample, we recording stereo (2 x 1 byte) therefore is this divided by 2
+ 
+    start& = 0: LRO& = 0
+    Do Until start& = Left.SIZE
+        RawLeft = _MemGet(Left, Left.OFFSET + start&, Single)
+        RawRight = _MemGet(Right, Right.OFFSET + start&, Single)
+ 
+        LeftChannel8 = 128 - RawLeft * 128
+        RightChannel8 = 128 - RawRight * 128
+ 
+        _MemPut Recalc, Recalc.OFFSET + s&, LeftChannel8
+        _MemPut Recalc, Recalc.OFFSET + s& + 1, RightChannel8
+        s& = s& + 2
+        start& = start& + 4
+    Loop
+ 
+    'write audio data to file
+ 
+    WAVeRAW$ = Space$(s&)
+    _MemGet Recalc, Recalc.OFFSET, WAVeRAW$
+    Put #ch, , WAVeRAW$
+ 
+    'erase memory
+    _MemFree Recalc
+    WAVeRAW$ = ""
+    Close ch
+End Sub
+ 
+Function OFFSET_to_I64 (value As _Offset)
+    Dim m As _MEM
+    $If 32BIT Then
+        DIM num AS LONG
+        m = _MEM(num)
+        _MEMPUT m,m.offset, value
+        Offset_to_i64 = num
+        _MEMFREE m
+    $Else
+        Dim num As _Integer64
+        m = _Mem(num)
+        _MemPut m, m.OFFSET, value
+        OFFSET_to_I64 = num
+        _MemFree m
+    $End If
+End Function
+ 
